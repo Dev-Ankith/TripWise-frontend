@@ -20,7 +20,16 @@ const DestinationCard = ({ destination, onSelectForBuilder }) => {
   return (
     <div className="destination-card card">
       <div className="dest-image-wrapper">
-        <img src={image} alt={name} className="dest-image" loading="lazy" />
+        <img 
+          src={image} 
+          alt={name} 
+          className="dest-image" 
+          loading="lazy"
+          onError={(e) => {
+            e.target.onerror = null;
+            e.target.src = 'https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=1000&q=80';
+          }}
+        />
         <span className="dest-category-pill">{category}</span>
         <div className="dest-rating-pill">
           <Star size={13} fill="#F59E0B" color="#F59E0B" />

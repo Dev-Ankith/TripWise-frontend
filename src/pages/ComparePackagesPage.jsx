@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   GitCompare, 
   IndianRupee, 
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { mockAgentPackages, tripComponentsCatalog } from '../data/destinationsData';
 import { useTrip } from '../context/TripContext';
+import { PackageCompareApi } from '../services/api';
 import './ComparePackagesPage.css';
 
 const ComparePackagesPage = () => {
@@ -38,6 +39,33 @@ const ComparePackagesPage = () => {
 
   // Are the services strictly equivalent checkbox
   const [isServiceEquivalent, setIsServiceEquivalent] = useState(true);
+
+  // Backend transparency disclaimer state
+  const [backendDisclaimer, setBackendDisclaimer] = useState('');
+
+  // Call backend package comparison API
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const incList = agentIncludedList.split('\n').map(s => s.trim()).filter(Boolean);
+      PackageCompareApi.compare({
+        packageName: agentPackageTitle || agentName,
+        destination: selectedAgentPreset.destinationName || 'Goa',
+        packagePrice: Number(agentQuotedPrice) || 0,
+        selfBuiltCost: Number(selfBuiltCustomPrice) || 0,
+        includedServices: incList
+      })
+      .then((res) => {
+        if (res.data && res.data.transparencyDisclaimer) {
+          setBackendDisclaimer(res.data.transparencyDisclaimer);
+        }
+      })
+      .catch((err) => {
+        console.info('Backend package compare note:', err.message);
+      });
+    }, 400);
+
+    return () => clearTimeout(timer);
+  }, [agentQuotedPrice, selfBuiltCustomPrice, agentIncludedList, agentPackageTitle, selectedAgentPreset]);
 
   // Load a preset template
   const handleSelectPreset = (pkg) => {

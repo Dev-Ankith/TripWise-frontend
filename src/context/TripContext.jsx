@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { sampleUserTrips } from '../data/destinationsData';
+import { TripApi } from '../services/api';
 
 const TripContext = createContext();
 
@@ -44,6 +45,39 @@ export const TripProvider = ({ children }) => {
     }
     return sampleUserTrips;
   });
+
+  // Fetch trips from Spring Boot backend on mount if available
+  useEffect(() => {
+    TripApi.getAll()
+      .then((res) => {
+        if (res.data && res.data.length > 0) {
+          const backendTrips = res.data.map((bt) => ({
+            id: bt.id,
+            backendId: bt.id,
+            title: bt.tripName,
+            destination: bt.destinationName,
+            dates: `${bt.startDate} to ${bt.endDate}`,
+            durationDays: 5,
+            travelers: bt.numberOfTravelers,
+            budgetTotal: Number(bt.budget),
+            actualCost: Number(bt.totalEstimatedCost),
+            status: bt.status || 'Planned',
+            coverImage: 'https://images.unsplash.com/photo-1512343879784-a960bf40e7f2?auto=format&fit=crop&w=600&q=80',
+            savingsVsAgent: 'Direct planned via backend API',
+            breakdown: {}
+          }));
+          // Merge backend trips with local trips without duplicate IDs
+          setSavedTrips((prev) => {
+            const existingIds = new Set(prev.map(t => String(t.id)));
+            const newOnes = backendTrips.filter(t => !existingIds.has(String(t.id)));
+            return [...newOnes, ...prev];
+          });
+        }
+      })
+      .catch((err) => {
+        console.info('Backend trips sync notice (offline mode available):', err.message);
+      });
+  }, []);
 
   // Mock Authentication state
   const [user, setUser] = useState(() => {
@@ -91,8 +125,8 @@ export const TripProvider = ({ children }) => {
     }));
   };
 
-  // Add a newly finalized trip to savedTrips
-  const saveTrip = (newTripData) => {
+  // Add a newly finalized trip to savedTrips and persist to backend
+  const saveTrip = async (newTripData) => {
     const tripToSave = {
       id: `trip-${Date.now()}`,
       title: `${newTripData.destinationName.split(',')[0]} Custom Adventure`,
@@ -108,13 +142,50 @@ export const TripProvider = ({ children }) => {
       savingsVsAgent: `Custom planned without agent commission`
     };
 
+    // Save to backend database if destination ID is available or can be resolved
+    try {
+      const destId = newTripData.destinationId || 1;
+      const calcEndDate = () => {
+        try {
+          const d = new Date(newTripData.startDate);
+          d.setDate(d.getDate() + (Number(newTripData.durationDays) || 4));
+          return d.toISOString().split('T')[0];
+        } catch {
+          return '2026-11-20';
+        }
+      };
+
+      const backendPayload = {
+        tripName: tripToSave.title,
+        destinationId: destId,
+        startDate: newTripData.startDate || '2026-11-15',
+        endDate: calcEndDate(),
+        numberOfTravelers: Number(newTripData.travelers) || 2,
+        budget: Number(newTripData.budget) || 35000,
+        interests: 'Adventure, Nature, Culture',
+        status: 'PLANNED'
+      };
+
+      const res = await TripApi.create(backendPayload);
+      if (res.data && res.data.id) {
+        tripToSave.backendId = res.data.id;
+      }
+    } catch (err) {
+      console.info('Saved locally (backend optional sync note):', err.message);
+    }
+
     setSavedTrips((prev) => [tripToSave, ...prev]);
     return tripToSave.id;
   };
 
-  // Delete trip from list
-  const deleteTrip = (tripId) => {
-    setSavedTrips((prev) => prev.filter((t) => t.id !== tripId));
+  // Delete trip from list and backend
+  const deleteTrip = async (tripId) => {
+    // If it is a numeric ID or has backendId, delete from backend
+    const numericId = Number(tripId);
+    if (!isNaN(numericId) && numericId > 0) {
+      TripApi.delete(numericId).catch(() => {});
+    }
+    setSavedTrips((prev) => prev.filter((t) => t.id !== tripId && t.backendId !== tripId));
   };
 
   // Mock login function

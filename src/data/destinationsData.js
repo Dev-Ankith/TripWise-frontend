@@ -42,7 +42,7 @@ export const destinationsData = [
     state: 'Rajasthan',
     category: 'Heritage',
     bestSeason: 'Oct - Mar',
-    image: 'https://images.unsplash.com/photo-1603262110263-fb010d65a5cd?auto=format&fit=crop&w=1000&q=80',
+    image: 'https://images.unsplash.com/photo-1599661046289-e31897846e41?auto=format&fit=crop&w=1000&q=80',
     description: 'The Pink City steeped in royal Rajput history, majestic hillside fortresses, colorful bazaars, and opulent palaces.',
     estCostPerPerson: 12500,
     rating: 4.7,

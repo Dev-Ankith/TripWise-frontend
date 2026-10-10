@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -11,7 +11,8 @@ import {
   ArrowUpDown,
   Sparkles
 } from 'lucide-react';
-import { destinationsData } from '../data/destinationsData';
+import { destinationsData as initialMockDestinations } from '../data/destinationsData';
+import { DestinationApi } from '../services/api';
 import DestinationCard from '../components/DestinationCard';
 import { useTrip } from '../context/TripContext';
 import './ExploreDestinationsPage.css';
@@ -23,6 +24,7 @@ const ExploreDestinationsPage = () => {
   const [searchParams] = useSearchParams();
   const initialCategory = searchParams.get('cat') || 'All';
 
+  const [destinationsList, setDestinationsList] = useState(initialMockDestinations);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [selectedStyle, setSelectedStyle] = useState('All');
@@ -32,9 +34,43 @@ const ExploreDestinationsPage = () => {
   const navigate = useNavigate();
   const { updateCurrentTrip } = useTrip();
 
+  // Fetch destinations from Spring Boot Backend
+  useEffect(() => {
+    DestinationApi.getAll()
+      .then((res) => {
+        if (res.data && res.data.length > 0) {
+          // Map backend entities to frontend display model
+          const mapped = res.data.map((d, index) => {
+            const fallback = initialMockDestinations.find(
+              (m) => m.name.toLowerCase().includes(d.name.toLowerCase().slice(0, 4))
+            ) || initialMockDestinations[index % initialMockDestinations.length];
+
+            return {
+              id: d.id,
+              name: d.name,
+              state: d.state,
+              category: d.travelCategory || fallback.category,
+              image: d.imageUrl || fallback.image,
+              description: d.description || fallback.description,
+              estCostPerPerson: Number(d.estimatedStartingCost) || fallback.estCostPerPerson,
+              rating: fallback.rating || 4.8,
+              reviewsCount: fallback.reviewsCount || 250,
+              popularAttractions: fallback.popularAttractions || [d.name, 'Sightseeing', 'Local Market'],
+              travelStyles: fallback.travelStyles || ['Adventure', 'Leisure', 'Culture'],
+              durationDays: fallback.durationDays || '4-5 Days'
+            };
+          });
+          setDestinationsList(mapped);
+        }
+      })
+      .catch((err) => {
+        console.info('Backend destinations fetch fallback to local mock:', err.message);
+      });
+  }, []);
+
   // Filtered & sorted destinations
   const filteredDestinations = useMemo(() => {
-    return destinationsData
+    return destinationsList
       .filter((dest) => {
         // Query match
         const matchesQuery = 
